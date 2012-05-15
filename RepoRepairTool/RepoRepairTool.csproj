@@ -118,6 +118,7 @@
     </ApplicationDefinition>
     <Compile Include="ViewModels\AppBootstrapper.cs" />
     <Compile Include="ViewModels\DropRepoViewModel.cs" />
+    <Compile Include="ViewModels\RepairViewModel.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

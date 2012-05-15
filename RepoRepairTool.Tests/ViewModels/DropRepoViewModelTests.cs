@@ -4,8 +4,12 @@ using System.Linq;
 using System.Reactive.Linq;
 using System.Text;
 using GitHub;
+using NSubstitute;
 using Newtonsoft.Json;
+using Ninject;
+using Ninject.MockingKernel.NSubstitute;
 using ReactiveUI;
+using ReactiveUI.Routing;
 using ReactiveUI.Xaml;
 using RepoRepairTool.ViewModels;
 using Should;
@@ -25,7 +29,7 @@ namespace RepoRepairTool.Tests.ViewModels
             UserError error = null;
 
             using(UserError.OverrideHandlersForTesting(x => { error = x; return RecoveryOptionResult.CancelOperation; })) {
-                var fixture = new DropRepoViewModel(null);
+                var fixture = new DropRepoViewModel(null, null);
                 fixture.AnalyzeRepo.Execute(input);
             }
 
@@ -37,7 +41,7 @@ namespace RepoRepairTool.Tests.ViewModels
         {
             var repoRootPath = CoreUtility.FindRepositoryRoot(IntegrationTestHelper.GetIntegrationTestRootDirectory());
 
-            var fixture = new DropRepoViewModel(null);
+            var fixture = new DropRepoViewModel(null, null);
             fixture.AnalyzeRepo.Execute(repoRootPath);
             fixture.AnalyzeRepo.ItemsInflight.Where(x => x == 0).First();
 

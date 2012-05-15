@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using Akavache;
+using GitHub.Helpers;
 using Ninject;
 using Ninject.Extensions.Conventions;
 using Ninject.Extensions.Conventions.BindingGenerators;
@@ -18,10 +19,31 @@ namespace RepoRepairTool.ViewModels
 {
     public interface IAppState : IReactiveNotifyPropertyChanged
     {
+        string CurrentRepo { get; set; }
+        Dictionary<string, HeuristicTreeInformation> BranchInformation { get; set; }
+        HeuristicTreeInformation WorkingDirectoryInformation { get; set; }
     }
 
     public class AppBootstrapper : ReactiveObject, IScreen, IAppState
     {
+        string _CurrentRepo;
+        public string CurrentRepo {
+            get { return _CurrentRepo; }
+            set { this.RaiseAndSetIfChanged(x => x.CurrentRepo, value); }
+        }
+
+        Dictionary<string, HeuristicTreeInformation> _BranchInformation;
+        public Dictionary<string, HeuristicTreeInformation> BranchInformation {
+            get { return _BranchInformation; }
+            set { this.RaiseAndSetIfChanged(x => x.BranchInformation, value); }
+        }
+
+        HeuristicTreeInformation _WorkingDirectoryInformation;
+        public HeuristicTreeInformation WorkingDirectoryInformation {
+            get { return _WorkingDirectoryInformation; }
+            set { this.RaiseAndSetIfChanged(x => x.WorkingDirectoryInformation, value); }
+        }
+
         public IRoutingState Router { get; protected set; }
 
         public AppBootstrapper(IKernel kernel = null, IRoutingState router = null)

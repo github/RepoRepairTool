@@ -48,7 +48,7 @@ namespace RepoRepairTool.ViewModels
 
         public IScreen HostScreen { get; protected set; }
 
-        public DropRepoViewModel(IScreen hostScreen)
+        public DropRepoViewModel(IScreen hostScreen, IAppState appState)
         {
             HostScreen = hostScreen;
 
@@ -86,6 +86,18 @@ namespace RepoRepairTool.ViewModels
 
             scanResult.Select(x => x != null ? x.Item1 : null).ToProperty(this, x => x.CurrentRepoPath);
             scanResult.Select(x => x != null ? x.Item2 : null).ToProperty(this, x => x.RepoAnalysis);
+
+            this.WhenAny(x => x.RepoAnalysis, x => x.Value != null ? Visibility.Visible : Visibility.Hidden)
+                .ToProperty(this, x => x.RepairButtonVisibility);
+
+            RepairButton = new ReactiveCommand();
+            RepairButton.Subscribe(_ => {
+                appState.BranchInformation = RepoAnalysis.Keys.Where(x => x != "Working Directory").ToDictionary(x => x, x => RepoAnalysis[x]);
+                appState.WorkingDirectoryInformation = RepoAnalysis["Working Directory"];
+                appState.CurrentRepo = CurrentRepoPath;
+
+                HostScreen.Router.Navigate.Execute(RxApp.GetService<IRepairViewModel>());
+            });
         }
 
         IEnumerable<string> allFilesInDirectory(string rootPath)
