@@ -32,7 +32,7 @@ namespace RepoRepairTool.ViewModels
             RxApp.ConfigureServiceLocator(
                 (t, s) => kernel.Get(t, s), (t, s) => kernel.GetAll(t, s));
 
-            // TODO: Navigate to the first screen here
+            Router.Navigate.Execute(RxApp.GetService<IDropRepoViewModel>());
         }
 
         IKernel createStandardKernel()
