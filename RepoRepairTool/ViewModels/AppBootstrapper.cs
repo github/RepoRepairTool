@@ -20,8 +20,13 @@ namespace RepoRepairTool.ViewModels
     public interface IAppState : IReactiveNotifyPropertyChanged
     {
         string CurrentRepo { get; set; }
-        Dictionary<string, HeuristicTreeInformation> BranchInformation { get; set; }
+        IEnumerable<IBranchInformationViewModel> BranchInformation { get; set; }
         HeuristicTreeInformation WorkingDirectoryInformation { get; set; }
+    }
+
+    public static class Constants
+    {
+        public const string WorkingDirectory = "Working Directory";
     }
 
     public class AppBootstrapper : ReactiveObject, IScreen, IAppState
@@ -32,8 +37,8 @@ namespace RepoRepairTool.ViewModels
             set { this.RaiseAndSetIfChanged(x => x.CurrentRepo, value); }
         }
 
-        Dictionary<string, HeuristicTreeInformation> _BranchInformation;
-        public Dictionary<string, HeuristicTreeInformation> BranchInformation {
+        IEnumerable<IBranchInformationViewModel> _BranchInformation;
+        public IEnumerable<IBranchInformationViewModel> BranchInformation {
             get { return _BranchInformation; }
             set { this.RaiseAndSetIfChanged(x => x.BranchInformation, value); }
         }
