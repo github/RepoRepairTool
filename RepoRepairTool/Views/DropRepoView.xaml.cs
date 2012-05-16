@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using ReactiveUI;
 using ReactiveUI.Routing;
 using RepoRepairTool.ViewModels;
 
@@ -34,6 +35,8 @@ namespace RepoRepairTool.Views
         public DropRepoView()
         {
             this.InitializeComponent();
+            MessageBus.Current.Listen<string>("DropRepoViewState")
+                .Subscribe(x => VisualStateManager.GoToElementState(LayoutRoot, x, true));
         }
     }
 }
