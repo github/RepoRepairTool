@@ -137,7 +137,11 @@ namespace RepoRepairTool.ViewModels
                 HostScreen.Router.Navigate.Execute(RxApp.GetService<IRepairViewModel>());
             });
 
-            MessageBus.Current.RegisterMessageSource(scanResult.Select(_ => "RepoAdded"), "DropRepoViewState");
+            var viewStates = Observable.Merge(
+                AnalyzeRepo.ItemsInflight.Where(x => x > 0).Select(_ => "Analyzing"),
+                scanResult.Select(_ => "RepoAdded"));
+
+            MessageBus.Current.RegisterMessageSource(viewStates, "DropRepoViewState");
 
             this.WhenNavigatedTo(() =>
                 MessageBus.Current.Listen<string>("DropFolder").Subscribe(path => AnalyzeRepo.Execute(path)));

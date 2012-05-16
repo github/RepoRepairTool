@@ -3,7 +3,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:Routing="clr-namespace:ReactiveUI.Routing;assembly=ReactiveUI.Routing" xmlns:ei="http://schemas.microsoft.com/expression/2010/interactions" mc:Ignorable="d" x:Name="control"
+    xmlns:Routing="clr-namespace:ReactiveUI.Routing;assembly=ReactiveUI.Routing" xmlns:ei="http://schemas.microsoft.com/expression/2010/interactions" xmlns:i="http://schemas.microsoft.com/expression/2010/interactivity" xmlns:ReactiveUI_Blend="clr-namespace:ReactiveUI.Blend;assembly=ReactiveUI.Blend" mc:Ignorable="d" x:Name="control"
     x:Class="RepoRepairTool.Views.DropRepoView"
     d:DesignWidth="640" d:DesignHeight="480">
 
@@ -25,21 +25,40 @@
                         </ObjectAnimationUsingKeyFrames>
                     </Storyboard>
                 </VisualState>
+                <VisualState x:Name="Analyzing">
+                    <Storyboard>
+                        <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="(UIElement.Visibility)" Storyboard.TargetName="stackPanel">
+                            <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Collapsed}"/>
+                        </ObjectAnimationUsingKeyFrames>
+                        <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="(UIElement.Visibility)" Storyboard.TargetName="stackPanel1">
+                            <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Visible}"/>
+                        </ObjectAnimationUsingKeyFrames>
+                    </Storyboard>
+                </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
+        
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" MinHeight="62.88"/>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
+        
         <VisualStateManager.CustomVisualStateManager>
             <ei:ExtendedVisualStateManager/>
         </VisualStateManager.CustomVisualStateManager>
-        <TextBlock HorizontalAlignment="Center" TextWrapping="Wrap" d:LayoutOverrides="Height" FontSize="48" Text="GitHub Repo Repair Tool" Margin="0,0,0,-0.003"/>
+        
+        <TextBlock HorizontalAlignment="Center" TextWrapping="Wrap" d:LayoutOverrides="Height" FontSize="48" Text="GitHub Repo Repair Tool" />
+        
         <StackPanel x:Name="stackPanel" Orientation="Vertical" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center">
             <Rectangle Height="256" Stroke="Black" VerticalAlignment="Center" RadiusX="6" RadiusY="6" HorizontalAlignment="Center" Width="256" StrokeThickness="8" StrokeDashArray="0.7" />
             <TextBlock TextWrapping="Wrap" Text="Drop Repo Here" HorizontalAlignment="Center" FontSize="21.333" />
+        </StackPanel>
+        
+        <StackPanel x:Name="stackPanel1" Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Orientation="Vertical" Visibility="Collapsed">
+            <ProgressBar IsIndeterminate="True" Width="144" Height="32" />
+            <TextBlock FontSize="18" Text="Analyzing Repo..." HorizontalAlignment="Center" Margin="0,8,0,0" />
         </StackPanel>
         
         <ScrollViewer Grid.Row="2" Margin="48,0" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto">
@@ -48,8 +67,9 @@
                     <DataTemplate> <Routing:ViewModelViewHost ViewModel="{Binding}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" /> </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-        </ScrollViewer>
+        </ScrollViewer>        
 
-        <Button Content="Repair This Repo" Grid.Row="3" HorizontalAlignment="Center" Width="192.624" FontSize="24" Margin="8"/>
+        <Button Content="Repair This Repo" Grid.Row="3" HorizontalAlignment="Center" Width="192.624" FontSize="24" Margin="8" 
+            Visibility="{Binding RepairButtonVisibility}" Command="{Binding RepairButton}" />
     </Grid>
 </UserControl>
