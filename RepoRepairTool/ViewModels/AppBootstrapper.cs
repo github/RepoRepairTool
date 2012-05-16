@@ -77,7 +77,7 @@ namespace RepoRepairTool.ViewModels
         void bindAllViewModels(IKernel kernel)
         {
             Assembly.GetExecutingAssembly().GetTypes()
-                .Where(x => x.Namespace.Contains("ViewModels") && x.IsInterface)
+                .Where(x => (x.Namespace ?? "").Contains("ViewModels") && x.IsInterface)
                 .ForEach(x => {
                     if (!x.Name.Contains("ViewModel")) {
                         return;

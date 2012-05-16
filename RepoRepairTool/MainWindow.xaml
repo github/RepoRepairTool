@@ -3,5 +3,5 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:Routing="clr-namespace:ReactiveUI.Routing;assembly=ReactiveUI.Routing" x:Name="theWindow"
         Title="MainWindow" Height="350" Width="525">
-    <Routing:RoutedViewHost Router="{Binding Path=ViewModel.Router, ElementName=theWindow}" />
+    <Routing:RoutedViewHost Router="{Binding Path=ViewModel.Router, ElementName=theWindow}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
 </Window>

@@ -1,0 +1,48 @@
+﻿<UserControl
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    x:Class="RepoRepairTool.Views.BranchInformationView"
+    x:Name="UserControl"
+    d:DesignWidth="480" d:DesignHeight="128">
+
+    <Border Padding="16">
+        <Grid x:Name="LayoutRoot">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <TextBlock FontSize="18.667" Grid.Row="0" Text="{Binding BranchName}" />
+            
+            <TextBlock FontSize="14" Grid.Row="1" Text="{Binding BadEncodingInfoHeader}" />         
+            <ItemsControl ItemsSource="{Binding Path=Model.BadEncodingFiles}" Grid.Row="2">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Key}" />
+                            <TextBlock Text="{Binding Value}" Margin="2,0,0,0" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            
+            <TextBlock FontSize="14" Grid.Row="3" Text="{Binding BadEndingsInfoHeader}" Margin="0,8,0,0"/>
+            <ItemsControl ItemsSource="{Binding Path=Model.BadLineEndingFiles}" Grid.Row="4">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Key}" />
+                            <TextBlock Text="{Binding Value}" Margin="2,0,0,0" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>         
+        </Grid>
+    </Border>
+</UserControl>

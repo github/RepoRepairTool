@@ -73,14 +73,14 @@ namespace RepoRepairTool.ViewModels
 
             AnalyzeRepo = new ReactiveAsyncCommand();
 
+            CoreUtility.ExtractLibGit2();
+
             IObservable<Tuple<string, Dictionary<string, HeuristicTreeInformation>>> scanResult;
             if (analyzeFunc != null) {
                 scanResult = AnalyzeRepo.RegisterAsyncObservable(x => analyzeFunc.AnalyzeRepo((string) x));
             } else {
                 scanResult = AnalyzeRepo.RegisterAsyncObservable(pathObj => {
                     Repository repo;
-
-                    CoreUtility.ExtractLibGit2();
 
                     try {
                         repo = new Repository((string)pathObj);
@@ -136,6 +136,9 @@ namespace RepoRepairTool.ViewModels
 
                 HostScreen.Router.Navigate.Execute(RxApp.GetService<IRepairViewModel>());
             });
+
+            this.WhenNavigatedTo(() =>
+                MessageBus.Current.Listen<string>("DropFolder").Subscribe(path => AnalyzeRepo.Execute(path)));
         }
 
         IEnumerable<string> allFilesInDirectory(DirectoryInfo rootPath)
