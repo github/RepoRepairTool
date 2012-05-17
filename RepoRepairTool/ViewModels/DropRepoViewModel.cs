@@ -154,7 +154,6 @@ namespace RepoRepairTool.ViewModels
         Stream safeOpenFileRead(string fileName)
         {
             try {
-                this.Log().Info("Trying to open {0}", fileName);
                 var fi = new FileInfo(fileName);
                 if (fi.Length == 0) {
                     return null;
