@@ -68,6 +68,7 @@ namespace RepoRepairTool.ViewModels
 
             ret.Bind<IScreen>().ToConstant(this);
             ret.Bind<IAppState>().ToConstant(this);
+            ret.Bind<IRepoAnalysisProvider>().To<RepoAnalysisProvider>();
 
             bindAllViewModels(ret);
 

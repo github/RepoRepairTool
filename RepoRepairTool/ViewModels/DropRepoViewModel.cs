@@ -67,7 +67,7 @@ namespace RepoRepairTool.ViewModels
 
         public IScreen HostScreen { get; protected set; }
 
-        public DropRepoViewModel(IScreen hostScreen, IAppState appState, [Optional] IRepoAnalysisProvider analyzeFunc)
+        public DropRepoViewModel(IScreen hostScreen, IAppState appState, IRepoAnalysisProvider analyzeFunc)
         {
             HostScreen = hostScreen;
 
@@ -75,49 +75,7 @@ namespace RepoRepairTool.ViewModels
 
             CoreUtility.ExtractLibGit2();
 
-            IObservable<Tuple<string, Dictionary<string, HeuristicTreeInformation>>> scanResult;
-            if (analyzeFunc != null) {
-                scanResult = AnalyzeRepo.RegisterAsyncObservable(x => analyzeFunc.AnalyzeRepo((string) x));
-            } else {
-                scanResult = AnalyzeRepo.RegisterAsyncObservable(pathObj => {
-                    Repository repo;
-
-                    try {
-                        repo = new Repository((string)pathObj);
-                    } catch (Exception ex) {
-                        UserError.Throw("This doesn't appear to be a Git repository", ex);
-                        return Observable.Empty<Tuple<string, Dictionary<string, HeuristicTreeInformation>>>();
-                    }
-
-                    string path = (string) pathObj;
-                    var scanAllBranches = repo.Branches.Select(branch =>
-                        Observable.Defer(() =>
-                            Observable.Start(() =>
-                                branch.Tip.Tree.AnalyzeRepository(false), RxApp.TaskpoolScheduler)
-                            .Select(x => new { Branch = branch.Name, Result = x })))
-                        .Merge(2);
-
-                    var scanWorkingDirectory = Observable.Defer(() => Observable.Start(() => {
-                        var allFiles = allFilesInDirectory(new DirectoryInfo(path))
-                            .Select(x => Tuple.Create(x, safeOpenFileRead(x)))
-                            .Where(x => x.Item2 != null)
-                            .ToArray();
-
-                        var ret = new {
-                            Branch = Constants.WorkingDirectory,
-                            Result = TreeWalkerMixin.AnalyzeRepository(allFiles, false)
-                        };
-
-                        allFiles.ForEach(x => x.Item2.Dispose());
-                        return ret;
-                    }));
-
-                    return scanAllBranches.Merge(scanWorkingDirectory)
-                        .Aggregate(new Dictionary<string, HeuristicTreeInformation>(),
-                            (acc, x) => { acc[x.Branch] = x.Result; return acc; })
-                        .Select(x => Tuple.Create(path, x));
-                });
-            }
+            var scanResult = AnalyzeRepo.RegisterAsyncObservable(x => analyzeFunc.AnalyzeRepo((string) x));
 
             scanResult.Select(x => x.Item1).ToProperty(this, x => x.CurrentRepoPath);
             scanResult
@@ -146,7 +104,48 @@ namespace RepoRepairTool.ViewModels
             this.WhenNavigatedTo(() =>
                 MessageBus.Current.Listen<string>("DropFolder").Subscribe(path => AnalyzeRepo.Execute(path)));
         }
+    }
 
+    public class RepoAnalysisProvider : IRepoAnalysisProvider
+    {
+        public IObservable<Tuple<string, Dictionary<string, HeuristicTreeInformation>>> AnalyzeRepo(string path)
+        {
+            Repository repo;
+
+            try {
+                repo = new Repository(path);
+            } catch (Exception ex) {
+                UserError.Throw("This doesn't appear to be a Git repository", ex);
+                return Observable.Empty<Tuple<string, Dictionary<string, HeuristicTreeInformation>>>();
+            }
+
+            var scanAllBranches = repo.Branches.Select(branch =>
+                Observable.Defer(() =>
+                    Observable.Start(() =>
+                        branch.Tip.Tree.AnalyzeRepository(false), RxApp.TaskpoolScheduler)
+                    .Select(x => new { Branch = branch.Name, Result = x })))
+                .Merge(2);
+
+            var scanWorkingDirectory = Observable.Defer(() => Observable.Start(() => {
+                var allFiles = allFilesInDirectory(new DirectoryInfo(path))
+                    .Select(x => Tuple.Create(x, safeOpenFileRead(x)))
+                    .Where(x => x.Item2 != null)
+                    .ToArray();
+
+                var ret = new {
+                    Branch = Constants.WorkingDirectory,
+                    Result = TreeWalkerMixin.AnalyzeRepository(allFiles, false)
+                };
+
+                allFiles.ForEach(x => x.Item2.Dispose());
+                return ret;
+            }));
+
+            return scanAllBranches.Merge(scanWorkingDirectory)
+                .Aggregate(new Dictionary<string, HeuristicTreeInformation>(),
+                    (acc, x) => { acc[x.Branch] = x.Result; return acc; })
+                .Select(x => Tuple.Create(path, x));
+        }
         IEnumerable<string> allFilesInDirectory(DirectoryInfo rootPath)
         {
             return rootPath.SafeGetDirectories().Where(x => x.Name != ".git")

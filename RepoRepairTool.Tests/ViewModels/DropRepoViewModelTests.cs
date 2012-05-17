@@ -28,9 +28,12 @@ namespace RepoRepairTool.Tests.ViewModels
         [InlineData(null)]
         public void AnalyzeRepoWithThingsThatArentReposShouldFail(string input)
         {
+            var router = new RoutingState();
+            var kernel = new NSubstituteMockingKernel();
             UserError error = null;
 
-            var fixture = new DropRepoViewModel(null, null, null);
+            var fixture = setupStandardFixture(router, kernel, () => kernel.Bind<IRepoAnalysisProvider>().To<RepoAnalysisProvider>());
+
             using(UserError.OverrideHandlersForTesting(x => { error = x; return RecoveryOptionResult.CancelOperation; })) {
                 fixture.AnalyzeRepo.Execute(input);
             }
@@ -43,8 +46,11 @@ namespace RepoRepairTool.Tests.ViewModels
         public void ScanningOurselvesShouldReturnResults()
         {
             var repoRootPath = CoreUtility.FindRepositoryRoot(IntegrationTestHelper.GetIntegrationTestRootDirectory());
+            var router = new RoutingState();
+            var kernel = new NSubstituteMockingKernel();
 
-            var fixture = new DropRepoViewModel(null, null, null);
+            var fixture = setupStandardFixture(router, kernel, () => kernel.Bind<IRepoAnalysisProvider>().To<RepoAnalysisProvider>());
+
             fixture.AnalyzeRepo.Execute(repoRootPath);
             fixture.AnalyzeRepo.ItemsInflight.Where(x => x == 0).First();
 
@@ -72,22 +78,19 @@ namespace RepoRepairTool.Tests.ViewModels
         {
             var router = new RoutingState();
             var kernel = new NSubstituteMockingKernel();
-
-            RxApp.ConfigureServiceLocator((t,s) => kernel.Get(t,s), (t,s) => kernel.GetAll(t,s));
-
-            var branchInfo = new Dictionary<string, HeuristicTreeInformation>() {
-                { "Working Directory", new HeuristicTreeInformation("derp", true)}
-            };
-
-            kernel.Bind<IDropRepoViewModel>().To<DropRepoViewModel>();
-            kernel.Get<IRepoAnalysisProvider>().AnalyzeRepo(null)
-                .ReturnsForAnyArgs(Observable.Return(Tuple.Create("foo", branchInfo)));
-            kernel.Get<IScreen>().Router.Returns(router);
-
             IRoutableViewModel latestVm = null;
-            router.ViewModelObservable().Subscribe(x => latestVm = x);
 
-            var fixture = kernel.Get<IDropRepoViewModel>();
+            var fixture = setupStandardFixture(router, kernel, () => {
+                var branchInfo = new Dictionary<string, HeuristicTreeInformation>() {
+                    { "Working Directory", new HeuristicTreeInformation("derp", true)}
+                };
+
+                kernel.Get<IRepoAnalysisProvider>().AnalyzeRepo(null)
+                    .ReturnsForAnyArgs(Observable.Return(Tuple.Create("foo", branchInfo)));
+
+                router.ViewModelObservable().Subscribe(x => latestVm = x);
+            });
+
             fixture.AnalyzeRepo.Execute("foo");
 
             fixture.RepairButtonVisibility.ShouldEqual(Visibility.Visible);
@@ -98,6 +101,18 @@ namespace RepoRepairTool.Tests.ViewModels
             (latestVm is IRepairViewModel).ShouldBeTrue();
             result.CurrentRepo.ShouldEqual("foo");
             result.BranchInformation.ShouldNotBeNull();
+        }
+
+        IDropRepoViewModel setupStandardFixture(RoutingState router, IKernel kernel, Action beforeCreateCallback = null)
+        {
+            RxApp.ConfigureServiceLocator((t,s) => kernel.Get(t,s), (t,s) => kernel.GetAll(t,s));
+
+            kernel.Bind<IDropRepoViewModel>().To<DropRepoViewModel>();
+            kernel.Get<IScreen>().Router.Returns(router);
+
+            if (beforeCreateCallback != null) beforeCreateCallback();
+
+            return kernel.Get<IDropRepoViewModel>();
         }
     }
 }
