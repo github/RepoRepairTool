@@ -106,7 +106,7 @@ namespace RepoRepairTool.ViewModels
         }
     }
 
-    public class RepoAnalysisProvider : IRepoAnalysisProvider
+    public class RepoAnalysisProvider : IRepoAnalysisProvider, IEnableLogger
     {
         public IObservable<Tuple<string, Dictionary<string, HeuristicTreeInformation>>> AnalyzeRepo(string path)
         {
@@ -127,7 +127,11 @@ namespace RepoRepairTool.ViewModels
                 .Merge(2);
 
             var scanWorkingDirectory = Observable.Defer(() => Observable.Start(() => {
-                var allFiles = allFilesInDirectory(new DirectoryInfo(path))
+                var pathList = Enumerable.Concat(
+                    repo.Index.RetrieveStatus().Select(x => Path.Combine(path, x.FilePath)),
+                    repo.Index.Select(x => Path.Combine(path, x.Path)));
+
+                var allFiles = pathList
                     .Select(x => Tuple.Create(x, safeOpenFileRead(x)))
                     .Where(x => x.Item2 != null)
                     .ToArray();
@@ -146,17 +150,16 @@ namespace RepoRepairTool.ViewModels
                     (acc, x) => { acc[x.Branch] = x.Result; return acc; })
                 .Select(x => Tuple.Create(path, x));
         }
-        IEnumerable<string> allFilesInDirectory(DirectoryInfo rootPath)
-        {
-            return rootPath.SafeGetDirectories().Where(x => x.Name != ".git")
-                .SelectMany(allFilesInDirectory)
-                .Concat(rootPath.SafeGetFiles().Select(x => x.FullName))
-                .ToArray();
-        }
 
         Stream safeOpenFileRead(string fileName)
         {
             try {
+                this.Log().Info("Trying to open {0}", fileName);
+                var fi = new FileInfo(fileName);
+                if (fi.Length == 0) {
+                    return null;
+                }
+
                 return new Func<Stream>(() => File.OpenRead(fileName)).Retry(3);
             } catch (Exception ex) {
                 return null;
