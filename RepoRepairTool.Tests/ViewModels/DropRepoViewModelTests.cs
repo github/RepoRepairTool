@@ -23,8 +23,9 @@ namespace RepoRepairTool.Tests.ViewModels
     public class DropRepoViewModelTests : IEnableLogger
     {
         [Theory]
-        [InlineData("Derp")]
-        [InlineData("C:\\Windows\\System32\\Notepad.exe")]
+        [InlineData("Z:\\____Derp")]                        // Not found
+        [InlineData("C:\\Windows\\System32\\Notepad.exe")]  // It's a file
+        [InlineData("C:\\System Volume Information")]       // Access Denied
         [InlineData(null)]
         public void AnalyzeRepoWithThingsThatArentReposShouldFail(string input)
         {
@@ -49,7 +50,8 @@ namespace RepoRepairTool.Tests.ViewModels
             var router = new RoutingState();
             var kernel = new NSubstituteMockingKernel();
 
-            var fixture = setupStandardFixture(router, kernel, () => kernel.Bind<IRepoAnalysisProvider>().To<RepoAnalysisProvider>());
+            var fixture = setupStandardFixture(router, kernel, 
+                () => kernel.Bind<IRepoAnalysisProvider>().To<RepoAnalysisProvider>());
 
             fixture.AnalyzeRepo.Execute(repoRootPath);
             fixture.AnalyzeRepo.ItemsInflight.Where(x => x == 0).First();
