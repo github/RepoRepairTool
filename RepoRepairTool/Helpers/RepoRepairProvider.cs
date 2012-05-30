@@ -16,7 +16,9 @@ namespace RepoRepairTool.Helpers
     [Flags]
     public enum RepoRepairOptions {
         IgnoreRemoteBranches = 0x1 << 0,
-        IgnoreWorkingDirectory = 0x1 << 1,
+        IgnoreLocalBranches = 0x1 << 1,
+        IgnoreWorkingDirectory = 0x1 << 2,
+        IgnoreAllBranches = IgnoreLocalBranches | IgnoreRemoteBranches,
     }
 
     public interface IRepoRepairProvider : IEnableLogger
@@ -46,19 +48,62 @@ namespace RepoRepairTool.Helpers
                     repairWorkingDir(allWdFiles, repo.Info.WorkingDirectory, branchInfo));
             }
 
-            return repo.ProcessAllBranchesAsync(branch => repairBranch(branch, analysis.BranchAnalysisResults[branch.Name], options))
+            return repo.ProcessAllBranchesAsync(branch => repairBranch(repo, branch, analysis.BranchAnalysisResults[branch.Name], options))
                 .Select(_ => Unit.Default)
                 .Merge(repairWd)
                 .Aggregate(Unit.Default, (acc, _) => acc);
         }
 
-        IObservable<Unit> repairBranch(Branch branch, HeuristicTreeInformation branchAnalysis, RepoRepairOptions options)
+        IObservable<Unit> repairBranch(Repository repo, Branch branch, HeuristicTreeInformation branchAnalysis, RepoRepairOptions options)
         {
-            if (options.HasFlag(RepoRepairOptions.IgnoreRemoteBranches) && branch.IsRemote && !branch.IsTracking) {
+            if (options.HasFlag(RepoRepairOptions.IgnoreRemoteBranches) && branch.IsRemote) {
                 return Observable.Return(Unit.Default);
             }
 
-            return Observable.Throw<Unit>(new NotImplementedException());
+            if (options.HasFlag(RepoRepairOptions.IgnoreLocalBranches) && !branch.IsRemote) {
+                return Observable.Return(Unit.Default);
+            }
+
+            return Observable.Start(() => {
+                if (branch.IsRemote) {
+                    // TODO: Create a remote tracking branch
+                    return;
+                }
+
+                var oldTree = branch.Tip.Tree;
+                var newTree = TreeDefinition.From(oldTree);
+                branchAnalysis.BadEncodingFiles.Keys.ForEach(relativePath => processTreeEntry(oldTree, newTree, relativePath));
+                branchAnalysis.BadLineEndingFiles.Keys.ForEach(relativePath => 
+                    processTreeEntry(oldTree, newTree, relativePath, s => LineEndingInfo.FixLineEndingsForString(s, branchAnalysis.LineEndingType)));
+
+                var committer = new Signature(
+                    repo.Config.Get("user.name", "Unknown User"),
+                    repo.Config.Get("user.email", "unknown@localhost"),
+                    DateTimeOffset.Now);
+
+                // TODO: This commit message is stupid
+                var commit = repo.ObjectDatabase.CreateCommit("Repaired branch",
+                    new Signature("RepoRepairTool", "support@github.com", DateTimeOffset.Now),
+                    committer,
+                    repo.ObjectDatabase.CreateTree(newTree),
+                    new[] { branch.Tip });
+
+                repo.Refs.UpdateTarget(branch.CanonicalName, commit.Sha);
+            }, RxApp.TaskpoolScheduler);
+        }
+
+        void processTreeEntry(Tree originalTree, TreeDefinition newTree, string relativePath, Func<string, string> processor = null)
+        {
+            var mode = originalTree[relativePath].Mode;
+            var bytes = ((Blob)originalTree[relativePath].Target).Content;
+            var text = CoreUtility.GuessEncodingForBytes(bytes).GetString(bytes);  // TODO: Null check
+
+            var path = Path.GetTempFileName();
+            File.WriteAllText(path, processor != null ? processor(text) : text, Encoding.UTF8);
+
+            newTree.Remove(relativePath);
+            newTree.Add(relativePath, path, mode);
+            File.Delete(path);           
         }
 
         IObservable<Unit> repairWorkingDir(IEnumerable<Tuple<string, Stream>> filesInWd, string workingDir, HeuristicTreeInformation dirAnalysis)
@@ -90,7 +135,7 @@ namespace RepoRepairTool.Helpers
             lockList[path].CopyTo(ms);
 
             var bytes = ms.ToArray();
-            var text = CoreUtility.GuessEncodingForBytes(bytes).GetString(bytes);
+            var text = CoreUtility.GuessEncodingForBytes(bytes).GetString(bytes);  // TODO: Null check
             var source = Path.GetTempFileName();
 
             File.WriteAllText(source, processor != null ? processor(text) : text, Encoding.UTF8);
