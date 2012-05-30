@@ -11,6 +11,11 @@ using ReactiveUI.Xaml;
 
 namespace RepoRepairTool.ViewModels
 {
+    public static class Constants
+    {
+        public const string WorkingDirectory = "Working Directory";
+    }
+
     public interface IRepoAnalysisProvider
     {
         IObservable<RepoAnalysisResult> AnalyzeRepo(string repo);
@@ -18,15 +23,18 @@ namespace RepoRepairTool.ViewModels
 
     public static class RepositoryMixin
     {
-        public static IEnumerable<Tuple<string, Stream>> OpenAllFilesInWorkingDirectory(this Repository repo)
+        public static IEnumerable<string> GetAllFilesInWorkingDirectory(this Repository repo)
         {
             var path = repo.Info.WorkingDirectory;
-            var pathList = Enumerable.Concat(
+            return Enumerable.Concat(
                 repo.Index.RetrieveStatus().Select(x => Path.Combine(path, x.FilePath)),
                 repo.Index.Select(x => Path.Combine(path, x.Path)));
+        }
 
-            return pathList
-                .Select(x => Tuple.Create(x, safeOpenFileRead(x)))
+        public static IEnumerable<Tuple<string, Stream>> OpenAllFilesInWorkingDirectory(this Repository repo, FileAccess access)
+        {
+            return GetAllFilesInWorkingDirectory(repo)
+                .Select(x => Tuple.Create(x, safeOpenFile(x, access)))
                 .Where(x => x.Item2 != null)
                 .ToArray();
         }
@@ -39,18 +47,14 @@ namespace RepoRepairTool.ViewModels
                 .Merge(parallelism);
         }
 
-        static Stream safeOpenFileRead(string fileName)
+        static Stream safeOpenFile(string fileName, FileAccess access)
         {
-            try {
-                var fi = new FileInfo(fileName);
-                if (fi.Length == 0) {
-                    return null;
-                }
-
-                return new Func<Stream>(() => File.OpenRead(fileName)).Retry(3);
-            } catch (Exception ex) {
+            var fi = new FileInfo(fileName);
+            if (fi.Length == 0) {
                 return null;
             }
+
+            return new Func<Stream>(() => File.Open(fileName, FileMode.Open, access)).Retry(3);
         }
     }
 
@@ -70,7 +74,7 @@ namespace RepoRepairTool.ViewModels
                 Observable.Start(() => branch.Tip.Tree.AnalyzeRepository(false), RxApp.TaskpoolScheduler));
 
             var scanWorkingDirectory = Observable.Defer(() => Observable.Start(() => {
-                var allFiles = repo.OpenAllFilesInWorkingDirectory();
+                var allFiles = repo.OpenAllFilesInWorkingDirectory(FileAccess.Read);
 
                 var ret = Tuple.Create(Constants.WorkingDirectory, TreeWalkerMixin.AnalyzeRepository(allFiles, false));
 

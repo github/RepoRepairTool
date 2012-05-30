@@ -24,11 +24,6 @@ namespace RepoRepairTool.ViewModels
         HeuristicTreeInformation WorkingDirectoryInformation { get; set; }
     }
 
-    public static class Constants
-    {
-        public const string WorkingDirectory = "Working Directory";
-    }
-
     public class AppBootstrapper : ReactiveObject, IScreen, IAppState
     {
         string _CurrentRepo;
