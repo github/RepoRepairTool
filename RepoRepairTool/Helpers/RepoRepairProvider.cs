@@ -81,10 +81,10 @@ namespace RepoRepairTool.Helpers
                 // if we delete them after creating the TreeEntry, we'll be
                 // kicking the file out from under libgit2
                 branchAnalysis.BadEncodingFiles.Keys.ForEach(relativePath =>
-                    processTreeEntry(oldTree, newTree, relativePath, repo.Info.WorkingDirectory, tempDir.FullName));
+                    processTreeEntry(branch.Name, oldTree, newTree, relativePath, repo.Info.WorkingDirectory, tempDir.FullName));
 
                 branchAnalysis.BadLineEndingFiles.Keys.ForEach(relativePath =>
-                    processTreeEntry(oldTree, newTree, relativePath, repo.Info.WorkingDirectory, tempDir.FullName,
+                    processTreeEntry(branch.Name, oldTree, newTree, relativePath, repo.Info.WorkingDirectory, tempDir.FullName,
                         s => LineEndingInfo.FixLineEndingsForString(s, branchAnalysis.LineEndingType)));
 
                 var committer = new Signature(
@@ -104,7 +104,7 @@ namespace RepoRepairTool.Helpers
             }, RxApp.TaskpoolScheduler);
         }
 
-        string processTreeEntry(Tree originalTree, TreeDefinition newTree, string relativePath, string repoRootDir, string tempDir, Func<string, string> processor = null)
+        string processTreeEntry(string branchName, Tree originalTree, TreeDefinition newTree, string relativePath, string repoRootDir, string tempDir, Func<string, string> processor = null)
         {
             if (inNuGetPackagesDir(relativePath)) {
                 return null;
@@ -116,6 +116,8 @@ namespace RepoRepairTool.Helpers
 
             var path = Path.Combine(tempDir, Path.GetRandomFileName());
             File.WriteAllText(path, processor != null ? processor(text) : text, Encoding.UTF8);
+
+            this.Log().Info("Repaired {0}/{1}", branchName, relativePath);
 
             // XXX: Files added this way must be relative to the wd for no 
             // particular reason
@@ -163,6 +165,7 @@ namespace RepoRepairTool.Helpers
             var source = Path.GetTempFileName();
 
             File.WriteAllText(source, processor != null ? processor(text) : text, Encoding.UTF8);
+            this.Log().Info("Repaired WorkingDir/{0}", relativePath);
 
             inputFile.Dispose();
             if (lockList.ContainsKey(path)) lockList.Remove(path);
