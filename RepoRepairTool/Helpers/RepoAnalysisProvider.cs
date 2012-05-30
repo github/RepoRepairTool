@@ -35,6 +35,7 @@ namespace RepoRepairTool.ViewModels
         public static IEnumerable<Tuple<string, Stream>> OpenAllFilesInWorkingDirectory(this Repository repo, FileAccess access)
         {
             return GetAllFilesInWorkingDirectory(repo)
+                .Where(File.Exists)
                 .Select(x => Tuple.Create(x, safeOpenFile(x, access)))
                 .Where(x => x.Item2 != null)
                 .ToArray();
