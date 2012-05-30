@@ -73,9 +73,19 @@ namespace RepoRepairTool.Helpers
 
                 var oldTree = branch.Tip.Tree;
                 var newTree = TreeDefinition.From(oldTree);
-                branchAnalysis.BadEncodingFiles.Keys.ForEach(relativePath => processTreeEntry(oldTree, newTree, relativePath));
-                branchAnalysis.BadLineEndingFiles.Keys.ForEach(relativePath => 
-                    processTreeEntry(oldTree, newTree, relativePath, s => LineEndingInfo.FixLineEndingsForString(s, branchAnalysis.LineEndingType)));
+
+                var di = new DirectoryInfo(repo.Info.WorkingDirectory);
+                var tempDir = di.CreateSubdirectory("__TEMP__" + branch.Name.GetHashCode());
+
+                // NB: The temp files are only read after we make the commit,
+                // if we delete them after creating the TreeEntry, we'll be
+                // kicking the file out from under libgit2
+                branchAnalysis.BadEncodingFiles.Keys.ForEach(relativePath =>
+                    processTreeEntry(oldTree, newTree, relativePath, repo.Info.WorkingDirectory, tempDir.FullName));
+
+                branchAnalysis.BadLineEndingFiles.Keys.ForEach(relativePath =>
+                    processTreeEntry(oldTree, newTree, relativePath, repo.Info.WorkingDirectory, tempDir.FullName,
+                        s => LineEndingInfo.FixLineEndingsForString(s, branchAnalysis.LineEndingType)));
 
                 var committer = new Signature(
                     repo.Config.Get("user.name", "Unknown User"),
@@ -90,25 +100,29 @@ namespace RepoRepairTool.Helpers
                     new[] { branch.Tip });
 
                 repo.Refs.UpdateTarget(branch.CanonicalName, commit.Sha);
+                CoreUtility.DeleteDirectory(di.FullName);
             }, RxApp.TaskpoolScheduler);
         }
 
-        void processTreeEntry(Tree originalTree, TreeDefinition newTree, string relativePath, Func<string, string> processor = null)
+        string processTreeEntry(Tree originalTree, TreeDefinition newTree, string relativePath, string repoRootDir, string tempDir, Func<string, string> processor = null)
         {
             if (inNuGetPackagesDir(relativePath)) {
-                return;
+                return null;
             }
 
             var mode = originalTree[relativePath].Mode;
             var bytes = ((Blob)originalTree[relativePath].Target).Content;
             var text = CoreUtility.GuessEncodingForBytes(bytes).GetString(bytes);  // TODO: Null check
 
-            var path = Path.GetTempFileName();
+            var path = Path.Combine(tempDir, Path.GetRandomFileName());
             File.WriteAllText(path, processor != null ? processor(text) : text, Encoding.UTF8);
 
+            // XXX: Files added this way must be relative to the wd for no 
+            // particular reason
+            var relativeTempPath = path.Replace(repoRootDir, "");
             newTree.Remove(relativePath);
-            newTree.Add(relativePath, path, mode);
-            File.Delete(path);           
+            newTree.Add(relativePath, relativeTempPath, mode);
+            return path;
         }
 
         IObservable<Unit> repairWorkingDir(IEnumerable<Tuple<string, Stream>> filesInWd, string workingDir, HeuristicTreeInformation dirAnalysis)
@@ -138,12 +152,11 @@ namespace RepoRepairTool.Helpers
             if (lockList.ContainsKey(path)) {
                 inputFile = lockList[path];
             } else {
-                this.Log().Warn("File wasn't in lock list: {0}", path);
                 inputFile = File.OpenRead(path);
             }
 
             var ms = new MemoryStream();
-            lockList[path].CopyTo(ms);
+            inputFile.CopyTo(ms);
 
             var bytes = ms.ToArray();
             var text = CoreUtility.GuessEncodingForBytes(bytes).GetString(bytes);  // TODO: Null check
@@ -152,6 +165,7 @@ namespace RepoRepairTool.Helpers
             File.WriteAllText(source, processor != null ? processor(text) : text, Encoding.UTF8);
 
             inputFile.Dispose();
+            if (lockList.ContainsKey(path)) lockList.Remove(path);
             File.Copy(source, path, true);           
         }
 
