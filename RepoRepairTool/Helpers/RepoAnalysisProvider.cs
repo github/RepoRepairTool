@@ -27,8 +27,9 @@ namespace RepoRepairTool.ViewModels
         {
             var path = repo.Info.WorkingDirectory;
             return Enumerable.Concat(
-                repo.Index.RetrieveStatus().Select(x => Path.Combine(path, x.FilePath)),
-                repo.Index.Select(x => Path.Combine(path, x.Path)));
+                    repo.Index.RetrieveStatus().Select(x => Path.Combine(path, x.FilePath)),
+                    repo.Index.Select(x => Path.Combine(path, x.Path)))
+                .Distinct();
         }
 
         public static IEnumerable<Tuple<string, Stream>> OpenAllFilesInWorkingDirectory(this Repository repo, FileAccess access)
