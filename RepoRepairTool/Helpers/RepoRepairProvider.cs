@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Text;
+using GitHub;
 using GitHub.Helpers;
 using LibGit2Sharp;
 using ReactiveUI;
@@ -39,8 +41,9 @@ namespace RepoRepairTool.Helpers
                     return Observable.Throw<Unit>(ex);
                 }
 
+                var branchInfo = analysis.BranchAnalysisResults[Constants.WorkingDirectory];
                 repairWd = Observable.Defer(() =>
-                    repairWorkingDir(allWdFiles, analysis.BranchAnalysisResults[Constants.WorkingDirectory]));
+                    repairWorkingDir(allWdFiles, repo.Info.WorkingDirectory, branchInfo));
             }
 
             return repo.ProcessAllBranchesAsync(branch => repairBranch(branch, analysis.BranchAnalysisResults[branch.Name], options))
@@ -58,9 +61,42 @@ namespace RepoRepairTool.Helpers
             return Observable.Throw<Unit>(new NotImplementedException());
         }
 
-        IObservable<Unit> repairWorkingDir(IEnumerable<Tuple<string, Stream>> filesInWd, HeuristicTreeInformation dirAnalysis)
+        IObservable<Unit> repairWorkingDir(IEnumerable<Tuple<string, Stream>> filesInWd, string workingDir, HeuristicTreeInformation dirAnalysis)
         {
-            return Observable.Throw<Unit>(new NotImplementedException());
+            return Observable.Start(() => {
+                var lockList = filesInWd.ToDictionary(k => k.Item1, v => v.Item2);
+
+                dirAnalysis.BadEncodingFiles.Keys.ForEach(relativePath => 
+                    processWorkingDirectoryFile(Path.Combine(workingDir, relativePath), lockList));
+
+                dirAnalysis.BadLineEndingFiles.Keys.ForEach(relativePath =>
+                    processWorkingDirectoryFile(Path.Combine(workingDir, relativePath), lockList,
+                        s => LineEndingInfo.FixLineEndingsForString(s, dirAnalysis.LineEndingType))
+                );
+            }, RxApp.TaskpoolScheduler);
+        }
+
+        void processWorkingDirectoryFile(string path, Dictionary<string, Stream> lockList, Func<string, string> processor = null)
+        {
+            Stream inputFile;
+            if (lockList.ContainsKey(path)) {
+                inputFile = lockList[path];
+            } else {
+                this.Log().Warn("File wasn't in lock list: {0}", path);
+                inputFile = File.OpenRead(path);
+            }
+
+            var ms = new MemoryStream();
+            lockList[path].CopyTo(ms);
+
+            var bytes = ms.ToArray();
+            var text = CoreUtility.GuessEncodingForBytes(bytes).GetString(bytes);
+            var source = Path.GetTempFileName();
+
+            File.WriteAllText(source, processor != null ? processor(text) : text, Encoding.UTF8);
+
+            inputFile.Dispose();
+            File.Copy(source, path, true);           
         }
     }
 }
