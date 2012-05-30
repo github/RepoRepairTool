@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Reactive.Linq;
 using System.Windows;
+using Ninject;
 using Ninject.MockingKernel.NSubstitute;
 using ReactiveUI.Routing;
 using ReactiveUI.Xaml;
@@ -20,11 +21,10 @@ namespace RepoRepairTool.Tests.ViewModels
         [InlineData(null)]
         public void AnalyzeRepoWithThingsThatArentReposShouldFail(string input)
         {
-            var router = new RoutingState();
             var kernel = new NSubstituteMockingKernel();
-            UserError error = null;
 
-            var fixture = new RepoAnalysisProvider();
+            kernel.Bind<IRepoAnalysisProvider>().To<RepoAnalysisProvider>();
+            var fixture = kernel.Get<IRepoAnalysisProvider>();
 
             Assert.Throws<Exception>(() => {
                 fixture.AnalyzeRepo(input).First();
