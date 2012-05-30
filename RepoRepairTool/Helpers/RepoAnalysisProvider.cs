@@ -56,6 +56,7 @@ namespace RepoRepairTool.ViewModels
             return scanAllBranches.Merge(scanWorkingDirectory)
                 .Aggregate(new Dictionary<string, HeuristicTreeInformation>(),
                     (acc, x) => { acc[x.Branch] = x.Result; return acc; })
+                .Finally(() => repo.Dispose())
                 .Select(x => new RepoAnalysisResult() { RepositoryPath = path, BranchAnalysisResults = x });
         }
 
