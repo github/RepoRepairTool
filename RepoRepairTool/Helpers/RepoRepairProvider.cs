@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using GitHub;
 using GitHub.Helpers;
 using LibGit2Sharp;
@@ -94,6 +95,10 @@ namespace RepoRepairTool.Helpers
 
         void processTreeEntry(Tree originalTree, TreeDefinition newTree, string relativePath, Func<string, string> processor = null)
         {
+            if (inNuGetPackagesDir(relativePath)) {
+                return;
+            }
+
             var mode = originalTree[relativePath].Mode;
             var bytes = ((Blob)originalTree[relativePath].Target).Content;
             var text = CoreUtility.GuessEncodingForBytes(bytes).GetString(bytes);  // TODO: Null check
@@ -112,17 +117,23 @@ namespace RepoRepairTool.Helpers
                 var lockList = filesInWd.ToDictionary(k => k.Item1, v => v.Item2);
 
                 dirAnalysis.BadEncodingFiles.Keys.ForEach(relativePath => 
-                    processWorkingDirectoryFile(Path.Combine(workingDir, relativePath), lockList));
+                    processWorkingDirectoryFile(workingDir, relativePath, lockList));
 
                 dirAnalysis.BadLineEndingFiles.Keys.ForEach(relativePath =>
-                    processWorkingDirectoryFile(Path.Combine(workingDir, relativePath), lockList,
+                    processWorkingDirectoryFile(workingDir, relativePath, lockList,
                         s => LineEndingInfo.FixLineEndingsForString(s, dirAnalysis.LineEndingType))
                 );
             }, RxApp.TaskpoolScheduler);
         }
 
-        void processWorkingDirectoryFile(string path, Dictionary<string, Stream> lockList, Func<string, string> processor = null)
+        void processWorkingDirectoryFile(string repoRoot, string relativePath, Dictionary<string, Stream> lockList, Func<string, string> processor = null)
         {
+            var path = Path.Combine(repoRoot, relativePath);
+
+            if (inNuGetPackagesDir(relativePath)) {
+                return;
+            }
+
             Stream inputFile;
             if (lockList.ContainsKey(path)) {
                 inputFile = lockList[path];
@@ -142,6 +153,11 @@ namespace RepoRepairTool.Helpers
 
             inputFile.Dispose();
             File.Copy(source, path, true);           
+        }
+
+        bool inNuGetPackagesDir(string relativePath)
+        {
+            return Regex.IsMatch(relativePath, @"^packages[\\/]", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
         }
     }
 }
