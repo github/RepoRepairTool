@@ -16,6 +16,44 @@ namespace RepoRepairTool.ViewModels
         IObservable<RepoAnalysisResult> AnalyzeRepo(string repo);
     }
 
+    public static class RepositoryMixin
+    {
+        public static IEnumerable<Tuple<string, Stream>> OpenAllFilesInWorkingDirectory(this Repository repo)
+        {
+            var path = repo.Info.WorkingDirectory;
+            var pathList = Enumerable.Concat(
+                repo.Index.RetrieveStatus().Select(x => Path.Combine(path, x.FilePath)),
+                repo.Index.Select(x => Path.Combine(path, x.Path)));
+
+            return pathList
+                .Select(x => Tuple.Create(x, safeOpenFileRead(x)))
+                .Where(x => x.Item2 != null)
+                .ToArray();
+        }
+
+        public static IObservable<Tuple<string, TResult>> ProcessAllBranchesAsync<TResult>(this Repository repo, Func<Branch, IObservable<TResult>> selector, int parallelism = 2)
+        {
+            return repo.Branches.ToObservable()
+                .Select(branch => Observable.Defer(() =>
+                    selector(branch)).Select(result => Tuple.Create(branch.Name, result)))
+                .Merge(parallelism);
+        }
+
+        static Stream safeOpenFileRead(string fileName)
+        {
+            try {
+                var fi = new FileInfo(fileName);
+                if (fi.Length == 0) {
+                    return null;
+                }
+
+                return new Func<Stream>(() => File.OpenRead(fileName)).Retry(3);
+            } catch (Exception ex) {
+                return null;
+            }
+        }
+    }
+
     public class RepoAnalysisProvider : IRepoAnalysisProvider, IEnableLogger
     {
         public IObservable<RepoAnalysisResult> AnalyzeRepo(string path)
@@ -28,26 +66,13 @@ namespace RepoRepairTool.ViewModels
                 return Observable.Throw<RepoAnalysisResult>(new Exception("This doesn't appear to be a Git repository", ex));
             }
 
-            var scanAllBranches = repo.Branches.Select(branch =>
-                Observable.Defer(() =>
-                    Observable.Start(() => branch.Tip.Tree.AnalyzeRepository(false), RxApp.TaskpoolScheduler)
-                        .Select(x => new { Branch = branch.Name, Result = x })))
-                .Merge(2);
+            var scanAllBranches = repo.ProcessAllBranchesAsync(branch => 
+                Observable.Start(() => branch.Tip.Tree.AnalyzeRepository(false), RxApp.TaskpoolScheduler));
 
             var scanWorkingDirectory = Observable.Defer(() => Observable.Start(() => {
-                var pathList = Enumerable.Concat(
-                    repo.Index.RetrieveStatus().Select(x => Path.Combine(path, x.FilePath)),
-                    repo.Index.Select(x => Path.Combine(path, x.Path)));
+                var allFiles = repo.OpenAllFilesInWorkingDirectory();
 
-                var allFiles = pathList
-                    .Select(x => Tuple.Create(x, safeOpenFileRead(x)))
-                    .Where(x => x.Item2 != null)
-                    .ToArray();
-
-                var ret = new {
-                    Branch = Constants.WorkingDirectory,
-                    Result = TreeWalkerMixin.AnalyzeRepository(allFiles, false)
-                };
+                var ret = Tuple.Create(Constants.WorkingDirectory, TreeWalkerMixin.AnalyzeRepository(allFiles, false));
 
                 allFiles.ForEach(x => x.Item2.Dispose());
                 return ret;
@@ -55,23 +80,9 @@ namespace RepoRepairTool.ViewModels
 
             return scanAllBranches.Merge(scanWorkingDirectory)
                 .Aggregate(new Dictionary<string, HeuristicTreeInformation>(),
-                    (acc, x) => { acc[x.Branch] = x.Result; return acc; })
+                    (acc, x) => { acc[x.Item1] = x.Item2; return acc; })
                 .Finally(() => repo.Dispose())
                 .Select(x => new RepoAnalysisResult() { RepositoryPath = path, BranchAnalysisResults = x });
-        }
-
-        Stream safeOpenFileRead(string fileName)
-        {
-            try {
-                var fi = new FileInfo(fileName);
-                if (fi.Length == 0) {
-                    return null;
-                }
-
-                return new Func<Stream>(() => File.OpenRead(fileName)).Retry(3);
-            } catch (Exception ex) {
-                return null;
-            }
         }
     }
 
