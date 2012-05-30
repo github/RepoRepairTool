@@ -127,6 +127,7 @@
     </ApplicationDefinition>
     <Compile Include="Helpers\DisposableContainer.cs" />
     <Compile Include="Helpers\FilesystemInfoExtensions.cs" />
+    <Compile Include="Helpers\RepoRepairProvider.cs" />
     <Compile Include="Helpers\ShellDragDrop.cs" />
     <Compile Include="ViewModels\AppBootstrapper.cs" />
     <Compile Include="ViewModels\DropRepoViewModel.cs" />

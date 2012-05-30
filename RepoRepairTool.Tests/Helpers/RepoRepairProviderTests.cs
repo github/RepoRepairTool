@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reactive;
 using System.Reactive.Linq;
 using System.Text;
-using LibGit2Sharp;
 using Newtonsoft.Json;
 using Ninject;
 using Ninject.MockingKernel.NSubstitute;
@@ -64,25 +62,7 @@ namespace RepoRepairTool.Tests.Helpers
         }
 
         [Fact]
-        public void IgnoreNuGetPackagesDirectory()
-        {
-            throw new NotImplementedException();
-        }
-    }
-
-    [Flags]
-    public enum RepoRepairOptions {
-        IgnoreRemoteBranches = 0x1,
-    }
-
-    public interface IRepoRepairProvider : IEnableLogger
-    {
-        IObservable<Unit> RepairRepo(DisposableContainer<Repository> repo, RepoAnalysisResult analysis, RepoRepairOptions ignoreRemoteBranches);
-    }
-
-    public class RepoRepairProvider : IRepoRepairProvider
-    {
-        public IObservable<Unit> RepairRepo(DisposableContainer<Repository> repo, RepoAnalysisResult analysis, RepoRepairOptions ignoreRemoteBranches)
+        public void NuGetPackagesDirectoryShouldBeIgnored()
         {
             throw new NotImplementedException();
         }
