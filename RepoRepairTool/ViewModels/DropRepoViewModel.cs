@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
@@ -8,9 +6,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Windows;
 using GitHub;
-using GitHub.Extensions;
 using GitHub.Helpers;
-using LibGit2Sharp;
 using Ninject;
 using ReactiveUI;
 using ReactiveUI.Routing;
@@ -39,11 +35,6 @@ namespace RepoRepairTool.ViewModels
 
         string BadEncodingInfoHeader { get; }
         string BadEndingsInfoHeader { get; }
-    }
-
-    public interface IRepoAnalysisProvider
-    {
-        IObservable<Tuple<string, Dictionary<string, HeuristicTreeInformation>>> AnalyzeRepo(string repo);
     }
 
     public class DropRepoViewModel : ReactiveObject, IDropRepoViewModel
@@ -75,11 +66,18 @@ namespace RepoRepairTool.ViewModels
 
             CoreUtility.ExtractLibGit2();
 
-            var scanResult = AnalyzeRepo.RegisterAsyncObservable(x => analyzeFunc.AnalyzeRepo((string) x));
+            var scanResult = AnalyzeRepo.RegisterAsyncObservable(x => 
+                analyzeFunc.AnalyzeRepo((string) x).Catch<RepoAnalysisResult, Exception>(ex => {
+                    this.Log().WarnException("Failed to analyze repo", ex);
 
-            scanResult.Select(x => x.Item1).ToProperty(this, x => x.CurrentRepoPath);
+                    // XXX: This error message is derpy
+                    UserError.Throw("Couldn't analyze repo", ex);
+                    return Observable.Empty<RepoAnalysisResult>();
+                }));
+
+            scanResult.Select(x => x.RepositoryPath).ToProperty(this, x => x.CurrentRepoPath);
             scanResult
-                .Select(x => x.Item2.Select(y => (IBranchInformationViewModel)new BranchInformationViewModel(y.Key, y.Value)))
+                .Select(x => x.BranchAnalysisResults.Select(y => (IBranchInformationViewModel)new BranchInformationViewModel(y.Key, y.Value)))
                 .Select(x => new ReactiveCollection<IBranchInformationViewModel>(x))
                 .ToProperty(this, x => x.BranchInformation);
 
@@ -103,66 +101,6 @@ namespace RepoRepairTool.ViewModels
 
             this.WhenNavigatedTo(() =>
                 MessageBus.Current.Listen<string>("DropFolder").Subscribe(path => AnalyzeRepo.Execute(path)));
-        }
-    }
-
-    public class RepoAnalysisProvider : IRepoAnalysisProvider, IEnableLogger
-    {
-        public IObservable<Tuple<string, Dictionary<string, HeuristicTreeInformation>>> AnalyzeRepo(string path)
-        {
-            Repository repo;
-
-            try {
-                repo = new Repository(path);
-            } catch (Exception ex) {
-                UserError.Throw("This doesn't appear to be a Git repository", ex);
-                return Observable.Empty<Tuple<string, Dictionary<string, HeuristicTreeInformation>>>();
-            }
-
-            var scanAllBranches = repo.Branches.Select(branch =>
-                Observable.Defer(() =>
-                    Observable.Start(() =>
-                        branch.Tip.Tree.AnalyzeRepository(false), RxApp.TaskpoolScheduler)
-                    .Select(x => new { Branch = branch.Name, Result = x })))
-                .Merge(2);
-
-            var scanWorkingDirectory = Observable.Defer(() => Observable.Start(() => {
-                var pathList = Enumerable.Concat(
-                    repo.Index.RetrieveStatus().Select(x => Path.Combine(path, x.FilePath)),
-                    repo.Index.Select(x => Path.Combine(path, x.Path)));
-
-                var allFiles = pathList
-                    .Select(x => Tuple.Create(x, safeOpenFileRead(x)))
-                    .Where(x => x.Item2 != null)
-                    .ToArray();
-
-                var ret = new {
-                    Branch = Constants.WorkingDirectory,
-                    Result = TreeWalkerMixin.AnalyzeRepository(allFiles, false)
-                };
-
-                allFiles.ForEach(x => x.Item2.Dispose());
-                return ret;
-            }));
-
-            return scanAllBranches.Merge(scanWorkingDirectory)
-                .Aggregate(new Dictionary<string, HeuristicTreeInformation>(),
-                    (acc, x) => { acc[x.Branch] = x.Result; return acc; })
-                .Select(x => Tuple.Create(path, x));
-        }
-
-        Stream safeOpenFileRead(string fileName)
-        {
-            try {
-                var fi = new FileInfo(fileName);
-                if (fi.Length == 0) {
-                    return null;
-                }
-
-                return new Func<Stream>(() => File.OpenRead(fileName)).Retry(3);
-            } catch (Exception ex) {
-                return null;
-            }
         }
     }
 

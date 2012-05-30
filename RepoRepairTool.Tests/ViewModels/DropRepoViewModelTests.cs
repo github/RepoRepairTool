@@ -13,6 +13,7 @@ using Ninject.MockingKernel.NSubstitute;
 using ReactiveUI;
 using ReactiveUI.Routing;
 using ReactiveUI.Xaml;
+using RepoRepairTool.Tests;
 using RepoRepairTool.ViewModels;
 using Should;
 using Xunit;
@@ -22,21 +23,21 @@ namespace RepoRepairTool.Tests.ViewModels
 {
     public class DropRepoViewModelTests : IEnableLogger
     {
-        [Theory]
-        [InlineData("Z:\\____Derp")]                        // Not found
-        [InlineData("C:\\Windows\\System32\\Notepad.exe")]  // It's a file
-        [InlineData("C:\\System Volume Information")]       // Access Denied
-        [InlineData(null)]
-        public void AnalyzeRepoWithThingsThatArentReposShouldFail(string input)
+        [Fact]
+        public void ReposThatThrowShouldRaiseUserError()
         {
             var router = new RoutingState();
             var kernel = new NSubstituteMockingKernel();
             UserError error = null;
 
-            var fixture = setupStandardFixture(router, kernel, () => kernel.Bind<IRepoAnalysisProvider>().To<RepoAnalysisProvider>());
+            var fixture = setupStandardFixture(router, kernel, () => {
+                kernel.Get<IRepoAnalysisProvider>()
+                    .AnalyzeRepo(Arg.Any<string>())
+                    .ReturnsForAnyArgs(Observable.Throw<RepoAnalysisResult>(new Exception("Bork")));
+            });
 
             using(UserError.OverrideHandlersForTesting(x => { error = x; return RecoveryOptionResult.CancelOperation; })) {
-                fixture.AnalyzeRepo.Execute(input);
+                fixture.AnalyzeRepo.Execute(@"C:\\Foobar");
             }
 
             error.ShouldNotBeNull();
@@ -88,7 +89,8 @@ namespace RepoRepairTool.Tests.ViewModels
                 };
 
                 kernel.Get<IRepoAnalysisProvider>().AnalyzeRepo(null)
-                    .ReturnsForAnyArgs(Observable.Return(Tuple.Create("foo", branchInfo)));
+                    .ReturnsForAnyArgs(
+                        Observable.Return(new RepoAnalysisResult() { RepositoryPath = "foo", BranchAnalysisResults = branchInfo }));
 
                 router.ViewModelObservable().Subscribe(x => latestVm = x);
             });
