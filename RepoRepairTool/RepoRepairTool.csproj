@@ -130,7 +130,7 @@
     <Compile Include="ViewModels\AppBootstrapper.cs" />
     <Compile Include="ViewModels\DropRepoViewModel.cs" />
     <Compile Include="ViewModels\RepairViewModel.cs" />
-    <Compile Include="ViewModels\RepoAnalysisProvider.cs" />
+    <Compile Include="Helpers\RepoAnalysisProvider.cs" />
     <Compile Include="Views\BranchInformationView.xaml.cs">
       <DependentUpon>BranchInformationView.xaml</DependentUpon>
     </Compile>
