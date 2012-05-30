@@ -49,7 +49,7 @@ namespace RepoRepairTool.Tests.Helpers
                     .ShouldBeTrue();
 
                 var fixture = kernel.Get<IRepoRepairProvider>();
-                fixture.RepairRepo(repo, analysis, RepoRepairOptions.IgnoreRemoteBranches).First();
+                fixture.RepairRepo(repo.Value, analysis, RepoRepairOptions.IgnoreRemoteBranches).First();
 
                 var finalAnalysis = kernel.Get<IRepoAnalysisProvider>().AnalyzeRepo(repo.Value.Info.WorkingDirectory).First();
                 this.Log().Info("Final analysis for repaired: {0} {1}",

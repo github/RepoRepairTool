@@ -13,12 +13,12 @@ namespace RepoRepairTool.Helpers
 
     public interface IRepoRepairProvider : IEnableLogger
     {
-        IObservable<Unit> RepairRepo(DisposableContainer<Repository> repo, RepoAnalysisResult analysis, RepoRepairOptions ignoreRemoteBranches);
+        IObservable<Unit> RepairRepo(Repository repo, RepoAnalysisResult analysis, RepoRepairOptions ignoreRemoteBranches);
     }
 
     public class RepoRepairProvider : IRepoRepairProvider
     {
-        public IObservable<Unit> RepairRepo(DisposableContainer<Repository> repo, RepoAnalysisResult analysis, RepoRepairOptions ignoreRemoteBranches)
+        public IObservable<Unit> RepairRepo(Repository repo, RepoAnalysisResult analysis, RepoRepairOptions ignoreRemoteBranches)
         {
             throw new NotImplementedException();
         }
